@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS deployments;
+DROP TABLE IF EXISTS tickets;
+DROP TABLE IF EXISTS providers;
+DROP TABLE IF EXISTS users;
+DROP FUNCTION IF EXISTS update_updated_at;
