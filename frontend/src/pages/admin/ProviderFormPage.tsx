@@ -4,11 +4,26 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createProvider } from '../../api/providers'
 import { ArrowLeft } from 'lucide-react'
 
+// 两级 Provider 类型选项
+const providerTypes = [
+  { group: '云厂商', types: [
+    { value: 'aws_eks', label: 'AWS EKS' },
+    { value: 'aliyun_ack', label: '阿里云 ACK' },
+    { value: 'tencent_tke', label: '腾讯云 TKE' },
+    { value: 'huawei_cce', label: '华为云 CCE' },
+  ]},
+  { group: '基础设施', types: [
+    { value: 'docker', label: 'Docker' },
+    { value: 'vmware', label: 'VMware' },
+    { value: 'local', label: '本地集群' },
+  ]},
+]
+
 export default function ProviderFormPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [name, setName] = useState('')
-  const [type, setType] = useState('mock')
+  const [type, setType] = useState('aws_eks')
   const [config, setConfig] = useState('{}')
   const [configError, setConfigError] = useState('')
 
@@ -54,8 +69,13 @@ export default function ProviderFormPage() {
               <div>
                 <label className={labelCls}>类型</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
-                  <option value="mock">mock</option>
-                  <option value="aws">aws</option>
+                  {providerTypes.map((group) => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.types.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div>
