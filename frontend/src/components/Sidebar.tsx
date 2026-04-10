@@ -1,11 +1,25 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, PlusCircle, Server, LogOut, Ship } from 'lucide-react'
+import { Gauge, List, CirclePlus, Server, LogOut, Ship, PanelLeftOpen } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean
+  onToggle: () => void
+}
+
+const navItems = [
+  { to: '/dashboard', icon: Gauge, label: 'Dashboard' },
+  { to: '/tickets', icon: List, label: '工单列表' },
+  { to: '/tickets/type', icon: CirclePlus, label: '新建工单' },
+]
+
+const adminItems = [
+  { to: '/admin/providers', icon: Server, label: 'Provider 管理' },
+]
+
+export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-
   const isAdmin = user?.role === 'admin'
 
   const handleLogout = () => {
@@ -13,59 +27,111 @@ export default function Sidebar() {
     navigate('/login')
   }
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-indigo-600 text-white'
-        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-    }`
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center w-16 h-full bg-gray-50 border-r border-gray-200 py-5">
+        <div className="w-12 h-12 flex items-center justify-center">
+          <Ship className="w-6 h-6 text-brand-red" />
+        </div>
+        <nav className="flex-1 flex flex-col items-center gap-1 pt-6 w-full px-2">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `w-12 h-12 flex items-center justify-center rounded-lg transition-colors ${
+                  isActive ? 'bg-brand-red text-white' : 'text-gray-400 hover:bg-gray-100'
+                }`
+              }
+            >
+              <item.icon className="w-[18px] h-[18px]" />
+            </NavLink>
+          ))}
+          {isAdmin && adminItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `w-12 h-12 flex items-center justify-center rounded-lg transition-colors ${
+                  isActive ? 'bg-brand-red text-white' : 'text-gray-400 hover:bg-gray-100'
+                }`
+              }
+            >
+              <item.icon className="w-[18px] h-[18px]" />
+            </NavLink>
+          ))}
+        </nav>
+        <div className="flex flex-col items-center gap-1 w-full px-2">
+          <button
+            onClick={onToggle}
+            className="w-12 h-12 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+          >
+            <PanelLeftOpen className="w-[18px] h-[18px]" />
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-12 h-12 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 transition-colors"
+          >
+            <LogOut className="w-[18px] h-[18px]" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col h-full w-60 bg-gray-900 px-3 py-4">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-3 mb-6">
-        <Ship className="w-7 h-7 text-indigo-400" />
-        <span className="text-white text-xl font-bold tracking-tight">Woship</span>
+    <div className="flex flex-col w-60 h-full bg-gray-50 border-r border-gray-200 py-5 px-3">
+      <div className="flex items-center gap-2.5 px-3 py-2">
+        <Ship className="w-6 h-6 text-brand-red" />
+        <span className="text-xl font-bold text-gray-900">Woship</span>
       </div>
-
-      {/* Nav */}
-      <nav className="flex-1 space-y-1">
-        <NavLink to="/tickets" end={false} className={linkClass}>
-          {({ isActive }) => (
-            <>
-              <LayoutDashboard className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-              工单列表
-            </>
-          )}
-        </NavLink>
-
-        <NavLink to="/tickets/new" className={linkClass}>
-          {({ isActive }) => (
-            <>
-              <PlusCircle className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-              新建工单
-            </>
-          )}
-        </NavLink>
-
-        {isAdmin && (
-          <NavLink to="/admin/providers" className={linkClass}>
+      <nav className="flex-1 flex flex-col gap-1 pt-6">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-brand-red text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`
+            }
+          >
             {({ isActive }) => (
               <>
-                <Server className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-                Provider 管理
+                <item.icon className={`w-[18px] h-[18px] ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                {item.label}
               </>
             )}
           </NavLink>
-        )}
+        ))}
+        {isAdmin && adminItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-brand-red text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <item.icon className={`w-[18px] h-[18px] ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                {item.label}
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
-
-      {/* Bottom: logout */}
       <button
         onClick={handleLogout}
-        className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+        className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-100 transition-colors"
       >
-        <LogOut className="w-4 h-4 text-gray-400" />
+        <LogOut className="w-[18px] h-[18px]" />
         退出登录
       </button>
     </div>

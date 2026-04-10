@@ -3,16 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listTickets, type TicketStatus } from '../api/tickets'
 import StatusBadge from '../components/StatusBadge'
-import { PlusCircle, ChevronRight, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, ChevronRight } from 'lucide-react'
 
 type TabStatus = TicketStatus | 'all'
 
 const tabs: { label: string; value: TabStatus }[] = [
   { label: '全部',   value: 'all' },
-  { label: '草稿',   value: 'draft' },
   { label: '待审批', value: 'pending' },
   { label: '已批准', value: 'approved' },
-  { label: '已驳回', value: 'rejected' },
   { label: '部署中', value: 'deploying' },
   { label: '完成',   value: 'done' },
   { label: '失败',   value: 'failed' },
@@ -35,41 +33,40 @@ export default function TicketListPage() {
   })
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-8 space-y-6 h-full flex flex-col">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">工单列表</h1>
-          <p className="text-sm text-gray-500 mt-0.5">管理所有部署工单</p>
+          <p className="text-sm text-gray-400 mt-1">管理所有部署工单</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-3 py-1.5 rounded-lg transition"
+            className="flex items-center gap-1.5 text-[13px] font-medium text-gray-500 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             刷新
           </button>
           <button
-            onClick={() => navigate('/tickets/new')}
-            className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+            onClick={() => navigate('/tickets/type')}
+            className="flex items-center gap-2 bg-brand-red text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-brand-red-hover transition"
           >
-            <PlusCircle className="w-4 h-4" />
+            <Plus className="w-4 h-4" />
             新建工单
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto flex-wrap">
+      {/* Tabs — 设计稿圆角背景色切换 */}
+      <div className="flex gap-1 bg-gray-50 p-1 rounded-xl">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
+            className={`px-3 py-1.5 text-[13px] font-medium rounded-lg transition ${
               activeTab === tab.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             {tab.label}
@@ -78,62 +75,48 @@ export default function TicketListPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex-1">
         {isLoading ? (
           <div className="py-20 text-center text-gray-400">加载中...</div>
         ) : tickets.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-gray-400 text-sm">暂无工单</p>
-            <button
-              onClick={() => navigate('/tickets/new')}
-              className="mt-3 text-indigo-600 hover:underline text-sm"
-            >
+            <button onClick={() => navigate('/tickets/type')} className="mt-3 text-brand-red hover:underline text-sm">
               创建第一个工单
             </button>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-6 py-3 font-medium text-gray-500">标题</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500">类型</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500">状态</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-500">创建时间</th>
-                <th className="text-right px-6 py-3 font-medium text-gray-500">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {tickets.map((ticket) => (
-                <tr
-                  key={ticket.id}
-                  onClick={() => navigate(`/tickets/${ticket.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <td className="px-6 py-4 font-medium text-gray-900">{ticket.title}</td>
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                      {ticket.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={ticket.status} />
-                  </td>
-                  <td className="px-6 py-4 text-gray-500">{formatDate(ticket.created_at)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/tickets/${ticket.id}`)
-                      }}
-                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 ml-auto"
-                    >
-                      查看详情 <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div>
+            <div className="flex items-center bg-gray-100 px-6 py-3">
+              <div className="flex-1 text-xs font-medium text-gray-500">标题</div>
+              <div className="w-[100px] text-xs font-medium text-gray-500">类型</div>
+              <div className="w-[100px] text-xs font-medium text-gray-500">状态</div>
+              <div className="w-[160px] text-xs font-medium text-gray-500">创建时间</div>
+              <div className="w-[80px] text-xs font-medium text-gray-500 text-right">操作</div>
+            </div>
+            {tickets.map((ticket) => (
+              <div
+                key={ticket.id}
+                onClick={() => navigate(`/tickets/${ticket.id}`)}
+                className="flex items-center px-6 py-3.5 border-b border-gray-100 last:border-0 hover:bg-white cursor-pointer transition-colors"
+              >
+                <div className="flex-1 text-sm font-medium text-gray-900">{ticket.title}</div>
+                <div className="w-[100px]">
+                  <span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg">{ticket.type}</span>
+                </div>
+                <div className="w-[100px]"><StatusBadge status={ticket.status} /></div>
+                <div className="w-[160px] text-xs text-gray-400">{formatDate(ticket.created_at)}</div>
+                <div className="w-[80px] flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/tickets/${ticket.id}`) }}
+                    className="flex items-center gap-0.5 text-xs text-brand-red"
+                  >
+                    详情 <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
