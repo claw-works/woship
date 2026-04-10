@@ -3,6 +3,7 @@ package repo
 import (
 	"github.com/claw-works/woship/internal/model"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserRepo provides database operations for users.
@@ -42,4 +43,32 @@ func (r *UserRepo) GetByID(id string) (*model.User, error) {
 func (r *UserRepo) GetByEmail(email string) (*model.User, error) {
 	u := &model.User{}
 	return u, r.db.Get(u, `SELECT * FROM users WHERE email=$1`, email)
+}
+
+// EnsureAdmin creates the default admin user if it doesn't exist.
+// Returns the admin user and whether it was newly created.
+func (r *UserRepo) EnsureAdmin(email, password, name string) (*model.User, bool, error) {
+	existing, err := r.GetByEmail(email)
+	if err == nil && existing != nil {
+		return existing, false, nil
+	}
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		return nil, false, err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, false, err
+	}
+
+	admin := &model.User{
+		Email:        email,
+		PasswordHash: string(hash),
+		Name:         name,
+		Role:         model.RoleAdmin,
+	}
+	if err := r.Create(admin); err != nil {
+		return nil, false, err
+	}
+	return admin, true, nil
 }

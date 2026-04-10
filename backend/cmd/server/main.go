@@ -9,6 +9,7 @@ import (
 	"github.com/claw-works/woship/internal/db"
 	"github.com/claw-works/woship/internal/provider"
 	mockprovider "github.com/claw-works/woship/internal/provider/mock"
+	"github.com/claw-works/woship/internal/repo"
 	"github.com/claw-works/woship/internal/worker"
 	"github.com/joho/godotenv"
 )
@@ -41,6 +42,18 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 	log.Println("✅ Migrations applied")
+
+	// Ensure default admin user exists
+	userRepo := repo.NewUserRepo(database)
+	adminEmail := getenv("DEFAULT_ADMIN_EMAIL", "admin@woship.local")
+	adminPassword := getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
+	if admin, created, err := userRepo.EnsureAdmin(adminEmail, adminPassword, "Admin"); err != nil {
+		log.Fatalf("failed to ensure admin user: %v", err)
+	} else if created {
+		log.Printf("✅ Created default admin user: %s (password: %s) — CHANGE THIS PASSWORD IN PRODUCTION", admin.Email, adminPassword)
+	} else {
+		log.Printf("✅ Admin user already exists: %s", admin.Email)
+	}
 
 	// Build provider registry
 	registry := provider.NewRegistry()
