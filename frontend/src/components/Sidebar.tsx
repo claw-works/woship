@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Gauge, List, CirclePlus, Server, LogOut, Ship, PanelLeftOpen } from 'lucide-react'
+import { Gauge, List, Server, LogOut, Ship, PanelLeftOpen } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 interface SidebarProps {
@@ -10,7 +10,6 @@ interface SidebarProps {
 const navItems = [
   { to: '/dashboard', icon: Gauge, label: 'Dashboard' },
   { to: '/tickets', icon: List, label: '工单列表' },
-  { to: '/tickets/type', icon: CirclePlus, label: '新建工单' },
 ]
 
 const adminItems = [
