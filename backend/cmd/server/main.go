@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/claw-works/woship/internal/api"
 	"github.com/claw-works/woship/internal/db"
+	"github.com/claw-works/woship/internal/drift"
 	"github.com/claw-works/woship/internal/provider"
 	mockprovider "github.com/claw-works/woship/internal/provider/mock"
 	"github.com/claw-works/woship/internal/repo"
@@ -28,6 +30,7 @@ func main() {
 	}
 
 	jwtSecret := getenv("JWT_SECRET", "super-secret-key-change-in-production")
+	tfBinary := getenv("TF_BINARY", "tofu")
 	port := getenv("PORT", "8080")
 
 	// Connect to database
@@ -65,8 +68,14 @@ func main() {
 	// Start async worker pool (4 workers)
 	runner := worker.NewRunner(4)
 
+	// Start drift checker (every 10 minutes)
+	deployRepo := repo.NewDeploymentRepo(database)
+	driftRepo := repo.NewDriftRepo(database)
+	driftChecker := drift.NewChecker(deployRepo, driftRepo, "terraform/workspaces", tfBinary, 10*time.Minute)
+	driftChecker.Start()
+
 	// Build and start the server
-	srv := api.NewServer(database, registry, runner, jwtSecret)
+	srv := api.NewServer(database, registry, runner, jwtSecret, tfBinary)
 
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("🚀 Starting Woship server on %s", addr)

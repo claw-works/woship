@@ -116,23 +116,12 @@ func (s *TicketService) Approve(ticketID, reviewerID string, reviewerRole model.
 
 	// Build and enqueue the deployment job if factory is provided
 	if s.worker != nil && s.jobFactory != nil {
-		var payload model.DockerDeployPayload
-		if err := json.Unmarshal([]byte(t.Payload), &payload); err == nil {
-			d := &model.Deployment{
-				TicketID:   ticketID,
-				ProviderID: payload.ProviderID,
-				Namespace:  "woship",
-				AppName:    sanitizeName(t.Title),
-				Image:      payload.Image,
-				Status:     model.DeployPending,
-			}
-			if payload.Domain != "" {
-				d.Domain = &payload.Domain
-			}
+		d := buildDeployment(t)
+		if d != nil {
 			if s.deployRepo != nil {
 				_ = s.deployRepo.Create(d)
 			}
-			job, err := s.jobFactory(t, d, payload.ProviderID)
+			job, err := s.jobFactory(t, d, d.ProviderID)
 			if err == nil {
 				s.worker.Enqueue(ticketID, job)
 			}
@@ -181,9 +170,78 @@ func validatePayload(ticketType string, raw json.RawMessage) error {
 			return errors.New("provider_id is required")
 		}
 		return nil
+	case "db_request":
+		var p model.DbRequestPayload
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return err
+		}
+		if p.DbType == "" {
+			return errors.New("db_type is required")
+		}
+		if p.InstanceName == "" {
+			return errors.New("instance_name is required")
+		}
+		if p.ProviderID == "" {
+			return errors.New("provider_id is required")
+		}
+		return nil
+	case "dev_project":
+		var p model.DevProjectPayload
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return err
+		}
+		if p.ProjectName == "" {
+			return errors.New("project_name is required")
+		}
+		if p.Stack == "" {
+			return errors.New("stack is required")
+		}
+		return nil
 	default:
 		return errors.New("unknown ticket type: " + ticketType)
 	}
+}
+
+// buildDeployment creates a Deployment record based on ticket type.
+func buildDeployment(t *model.Ticket) *model.Deployment {
+	d := &model.Deployment{
+		TicketID:  t.ID,
+		Namespace: "woship",
+		AppName:   sanitizeName(t.Title),
+		Status:    model.DeployPending,
+	}
+
+	switch t.Type {
+	case "docker_deploy":
+		var p model.DockerDeployPayload
+		if err := json.Unmarshal([]byte(t.Payload), &p); err != nil {
+			return nil
+		}
+		d.ProviderID = p.ProviderID
+		d.Image = p.Image
+		if p.Domain != "" {
+			d.Domain = &p.Domain
+		}
+	case "db_request":
+		var p model.DbRequestPayload
+		if err := json.Unmarshal([]byte(t.Payload), &p); err != nil {
+			return nil
+		}
+		d.ProviderID = p.ProviderID
+		d.Image = p.DbType + ":" + p.Version
+		d.AppName = p.InstanceName
+	case "dev_project":
+		var p model.DevProjectPayload
+		if err := json.Unmarshal([]byte(t.Payload), &p); err != nil {
+			return nil
+		}
+		d.ProviderID = ""
+		d.Image = p.Stack
+		d.AppName = sanitizeName(p.ProjectName)
+	default:
+		return nil
+	}
+	return d
 }
 
 // sanitizeName converts a title to a k8s-safe app name.

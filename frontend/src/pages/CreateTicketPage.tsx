@@ -12,7 +12,9 @@ export default function CreateTicketPage() {
   const [title, setTitle] = useState('')
   const [image, setImage] = useState('')
   const [port, setPort] = useState(8080)
-  const [domain, setDomain] = useState('')
+  const [domainPrefix, setDomainPrefix] = useState('')
+  const [domainSuffix, setDomainSuffix] = useState('.brclient.chat')
+  const domain = domainPrefix ? `${domainPrefix}${domainSuffix}` : ''
   const [replicas, setReplicas] = useState(2)
   const [providerId, setProviderId] = useState('')
   const [cpu, setCpu] = useState('100m')
@@ -61,7 +63,7 @@ export default function CreateTicketPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">新建工单</h1>
-            <p className="text-sm text-gray-400 mt-1">创建 Docker 部署工单</p>
+            <p className="text-sm text-gray-400 mt-1">Docker 应用部署</p>
           </div>
         </div>
 
@@ -81,7 +83,15 @@ export default function CreateTicketPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelCls}>端口</label><input type="number" required value={port} onChange={(e) => setPort(Number(e.target.value))} className={inputCls} /></div>
-              <div><label className={labelCls}>域名</label><input type="text" required value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="myapp.example.com" className={inputCls} /></div>
+              <div><label className={labelCls}>域名</label>
+                <div className="flex">
+                  <input type="text" required value={domainPrefix} onChange={(e) => setDomainPrefix(e.target.value)} placeholder="my-app" className={`${inputCls} rounded-r-none border-r-0`} />
+                  <select value={domainSuffix} onChange={(e) => setDomainSuffix(e.target.value)} className="px-3 py-2.5 text-sm border border-gray-200 rounded-r-lg bg-gray-50 text-gray-500 focus:outline-none flex-shrink-0">
+                    <option value=".brclient.chat">.brclient.chat</option>
+                    <option value=".test.com">.test.com</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelCls}>副本数</label><input type="number" required min={1} value={replicas} onChange={(e) => setReplicas(Number(e.target.value))} className={inputCls} /></div>
@@ -129,11 +139,11 @@ export default function CreateTicketPage() {
           <div className="border-t border-gray-200" />
 
           <div className="flex gap-3">
-            <button type="button" onClick={handleSaveDraft} disabled={loading || !title || !image || !domain || !providerId}
+            <button type="button" onClick={handleSaveDraft} disabled={loading || !title || !image || !domainPrefix || !providerId}
               className="flex-1 border border-gray-200 text-gray-700 py-3 rounded-lg text-sm font-medium hover:bg-gray-100 disabled:opacity-50 transition">
               保存草稿
             </button>
-            <button type="button" onClick={handleSubmit} disabled={loading || !title || !image || !domain || !providerId}
+            <button type="button" onClick={handleSubmit} disabled={loading || !title || !image || !domainPrefix || !providerId}
               className="flex-1 bg-brand-red text-white py-3 rounded-lg text-sm font-semibold hover:bg-brand-red-hover disabled:opacity-50 transition">
               {loading ? '提交中...' : '提交审批'}
             </button>

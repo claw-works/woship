@@ -24,7 +24,7 @@ type Server struct {
 }
 
 // NewServer wires up all components and returns a configured Server.
-func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, jwtSecret string) *Server {
+func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, jwtSecret, tfBinary string) *Server {
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(echomiddleware.Logger())
@@ -45,7 +45,7 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	authSvc := service.NewAuthService(userRepo, jwtSecret)
 
 	// Build job factory using concrete repo types
-	jf := makeJobFactory(registry, ticketRepo, deployRepo)
+	jf := makeJobFactory(registry, ticketRepo, deployRepo, tfBinary)
 	ticketSvc := service.NewTicketService(ticketRepo, deployRepo, runner, jf)
 
 	// Handlers
@@ -54,6 +54,7 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	ticketHandler := handler.NewTicketHandler(ticketSvc, runner)
 	deployHandler := handler.NewDeploymentHandler(deployRepo)
 	providerHandler := handler.NewProviderHandler(providerRepo, registry)
+	driftHandler := handler.NewDriftHandler(repo.NewDriftRepo(db), deployRepo, ticketRepo, "terraform/workspaces", tfBinary)
 
 	// Public routes
 	e.GET("/health", func(c echo.Context) error {
@@ -84,6 +85,11 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	api.GET("/deployments/:id", deployHandler.GetByID)
 	api.DELETE("/deployments/:id", deployHandler.Delete)
 
+	// Drift
+	api.GET("/drift", driftHandler.ListAll)
+	api.GET("/deployments/:id/drift", driftHandler.ListByDeployment)
+	api.POST("/deployments/:id/remediate", driftHandler.Remediate, mw.RequireRole("admin"))
+
 	// Provider admin routes
 	adminProviders := api.Group("/providers", mw.RequireRole("admin"))
 	adminProviders.GET("", providerHandler.List)
@@ -100,25 +106,38 @@ func (s *Server) Start(addr string) error {
 	return s.e.Start(addr)
 }
 
-// makeJobFactory returns a JobFactory that creates DockerDeployJobs.
+// makeJobFactory returns a JobFactory that creates TerraformDeployJobs.
 func makeJobFactory(
 	registry *provider.Registry,
 	ticketRepo *repo.TicketRepo,
 	deployRepo *repo.DeploymentRepo,
+	tfBinary string,
 ) service.JobFactory {
 	return func(t *model.Ticket, d *model.Deployment, providerID string) (worker.Job, error) {
-		prov, err := registry.Get(providerID)
-		if err != nil {
-			// Fall back to a no-op if provider not in registry (e.g., tests)
+		switch t.Type {
+		case "docker_deploy":
+			return &jobs.TerraformDeployJob{
+				Ticket:        t,
+				Deployment:    d,
+				TicketRepo:    ticketRepo,
+				DeployRepo:    deployRepo,
+				TemplateDir:   "terraform/templates/docker_deploy",
+				WorkspaceBase: "terraform/workspaces",
+				Binary:        tfBinary,
+			}, nil
+		case "db_request":
+			return &jobs.TerraformDbJob{
+				Ticket:        t,
+				Deployment:    d,
+				TicketRepo:    ticketRepo,
+				DeployRepo:    deployRepo,
+				TemplateDir:   "terraform/templates/db_request",
+				WorkspaceBase: "terraform/workspaces",
+				Binary:        tfBinary,
+			}, nil
+		default:
 			return &noopWorkerJob{}, nil
 		}
-		return &jobs.DockerDeployJob{
-			Ticket:     t,
-			Deployment: d,
-			Provider:   prov,
-			TicketRepo: ticketRepo,
-			DeployRepo: deployRepo,
-		}, nil
 	}
 }
 

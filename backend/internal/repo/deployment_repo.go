@@ -58,3 +58,15 @@ func (r *DeploymentRepo) UpdateStatus(id string, status model.DeploymentStatus, 
 	)
 	return err
 }
+
+// UpdateDriftStatus sets the drift_status for a deployment.
+func (r *DeploymentRepo) UpdateDriftStatus(id string, driftStatus string) error {
+	_, err := r.db.Exec(`UPDATE deployments SET drift_status=$1 WHERE id=$2`, driftStatus, id)
+	return err
+}
+
+// ListRunning returns all deployments with status 'running'.
+func (r *DeploymentRepo) ListRunning() ([]model.Deployment, error) {
+	var deployments []model.Deployment
+	return deployments, r.db.Select(&deployments, `SELECT * FROM deployments WHERE status='running'`)
+}

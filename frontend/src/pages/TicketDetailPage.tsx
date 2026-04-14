@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getTicket, submitTicket, approveTicket, rejectTicket } from '../api/tickets'
+import { getTicket, submitTicket, approveTicket, rejectTicket, type Ticket, type DockerDeployPayload, type DbRequestPayload, type DevProjectPayload } from '../api/tickets'
 import { useAuth } from '../hooks/useAuth'
 import StatusBadge from '../components/StatusBadge'
 import LogStream from '../components/LogStream'
@@ -18,6 +18,61 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="text-[13px] text-gray-900 font-medium">{value}</span>
     </div>
   )
+}
+
+const mono = (v: unknown) => <span className="font-mono text-[13px]">{String(v ?? '-')}</span>
+const badge = (v: string) => <span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg">{v}</span>
+
+const typeLabel: Record<string, string> = {
+  docker_deploy: 'Docker 应用部署',
+  db_request: 'Database 申请',
+  dev_project: '新开发项目',
+}
+
+const stackLabel: Record<string, string> = {
+  go_react: 'Go + React',
+  nextjs: 'Next.js (全栈)',
+  vue_go: 'Vue + Go',
+  python_react: 'Python + React',
+  rust_react: 'Rust + React',
+}
+
+function TicketPayloadInfo({ ticket }: { ticket: Ticket }) {
+  const p = ticket.payload as Record<string, unknown>
+
+  if (ticket.type === 'docker_deploy') {
+    const d = p as DockerDeployPayload
+    return <>
+      <InfoRow label="Docker 镜像" value={mono(d.image)} />
+      <InfoRow label="域名" value={mono(d.domain)} />
+      <InfoRow label="端口 / 副本" value={mono(`${d.port} / ${d.replicas}`)} />
+      <InfoRow label="CPU / 内存" value={mono(`${d.resources?.cpu} / ${d.resources?.memory}`)} />
+      <InfoRow label="Provider" value={mono(d.provider_id)} />
+    </>
+  }
+
+  if (ticket.type === 'db_request') {
+    const d = p as DbRequestPayload
+    return <>
+      <InfoRow label="数据库类型" value={badge(d.db_type)} />
+      <InfoRow label="版本" value={mono(d.version)} />
+      <InfoRow label="实例名称" value={mono(d.instance_name)} />
+      <InfoRow label="存储容量" value={mono(`${d.storage_gb} GB`)} />
+      <InfoRow label="高可用" value={d.high_availability ? '✅ 已启用' : '未启用'} />
+      <InfoRow label="Provider" value={mono(d.provider_id)} />
+    </>
+  }
+
+  if (ticket.type === 'dev_project') {
+    const d = p as DevProjectPayload
+    return <>
+      <InfoRow label="项目名称" value={mono(d.project_name)} />
+      <InfoRow label="项目介绍" value={<span className="text-[13px] text-gray-900">{d.description || '-'}</span>} />
+      <InfoRow label="开发架构" value={badge(stackLabel[d.stack] ?? d.stack)} />
+    </>
+  }
+
+  return <InfoRow label="Payload" value={<pre className="text-xs font-mono whitespace-pre-wrap">{JSON.stringify(p, null, 2)}</pre>} />
 }
 
 export default function TicketDetailPage() {
@@ -74,12 +129,8 @@ export default function TicketDetailPage() {
         {/* Ticket Info */}
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
           <h2 className="text-[15px] font-semibold text-gray-900 mb-2">工单信息</h2>
-          <InfoRow label="工单类型" value={<span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-lg">{ticket.type}</span>} />
-          <InfoRow label="Docker 镜像" value={<span className="font-mono text-[13px]">{ticket.payload?.image}</span>} />
-          <InfoRow label="域名" value={ticket.payload?.domain} />
-          <InfoRow label="端口 / 副本" value={<span className="font-mono text-[13px]">{ticket.payload?.port} / {ticket.payload?.replicas}</span>} />
-          <InfoRow label="CPU / 内存" value={<span className="font-mono text-[13px]">{ticket.payload?.resources?.cpu} / {ticket.payload?.resources?.memory}</span>} />
-          <InfoRow label="Provider" value={<span className="font-mono text-[13px]">{ticket.payload?.provider_id}</span>} />
+          <InfoRow label="工单类型" value={badge(typeLabel[ticket.type] ?? ticket.type)} />
+          <TicketPayloadInfo ticket={ticket} />
         </div>
 
         {/* Actions */}

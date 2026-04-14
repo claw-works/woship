@@ -22,6 +22,7 @@ type Deployment struct {
 	Image      string           `db:"image" json:"image"`
 	Domain     *string          `db:"domain" json:"domain,omitempty"`
 	Status     DeploymentStatus `db:"status" json:"status"`
+	DriftStatus string          `db:"drift_status" json:"drift_status"`
 	Logs       *string          `db:"logs" json:"logs,omitempty"`
 	CreatedAt  time.Time        `db:"created_at" json:"created_at"`
 	UpdatedAt  time.Time        `db:"updated_at" json:"updated_at"`

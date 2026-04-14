@@ -93,3 +93,20 @@ type ResourceSpec struct {
 	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
 }
+
+// DbRequestPayload holds parameters for a database request ticket.
+type DbRequestPayload struct {
+	DbType           string `json:"db_type"`
+	InstanceName     string `json:"instance_name"`
+	Version          string `json:"version"`
+	StorageGB        int    `json:"storage_gb"`
+	HighAvailability bool   `json:"high_availability"`
+	ProviderID       string `json:"provider_id"`
+}
+
+// DevProjectPayload holds parameters for a new development project ticket.
+type DevProjectPayload struct {
+	ProjectName string `json:"project_name"`
+	Description string `json:"description"`
+	Stack       string `json:"stack"`
+}

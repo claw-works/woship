@@ -9,7 +9,7 @@ const types = [
     iconBg: 'bg-gray-100',
     iconColor: 'text-brand-red',
     linkColor: 'text-brand-red',
-    to: '/tickets/new',
+    to: '/tickets/new/db',
   },
   {
     icon: Container,
@@ -18,7 +18,7 @@ const types = [
     iconBg: 'bg-blue-50',
     iconColor: 'text-brand-navy',
     linkColor: 'text-brand-navy',
-    to: '/tickets/new',
+    to: '/tickets/new/docker',
   },
   {
     icon: Sparkles,
@@ -27,7 +27,7 @@ const types = [
     iconBg: 'bg-emerald-50',
     iconColor: 'text-emerald-600',
     linkColor: 'text-emerald-600',
-    to: '/tickets/new',
+    to: '/tickets/new/dev',
   },
 ]
 
