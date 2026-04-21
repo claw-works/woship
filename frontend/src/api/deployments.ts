@@ -8,7 +8,7 @@ export interface Deployment {
   app_name: string
   image: string
   domain?: string
-  status: 'pending' | 'running' | 'stopped' | 'failed'
+  status: 'pending' | 'running' | 'destroying' | 'stopped' | 'failed'
   drift_status: 'clean' | 'drifted'
   created_at: string
   updated_at: string
@@ -37,3 +37,6 @@ export const listDeploymentDrift = (id: string) =>
 
 export const remediateDeployment = (id: string) =>
   client.post(`/api/deployments/${id}/remediate`)
+
+export const destroyDeployment = (id: string) =>
+  client.post(`/api/deployments/${id}/destroy`)

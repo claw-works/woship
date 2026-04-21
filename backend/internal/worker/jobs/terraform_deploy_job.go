@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/claw-works/woship/internal/model"
@@ -25,10 +26,7 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 	defer close(logCh)
 
 	send := func(msg string) {
-		select {
-		case logCh <- msg:
-		default:
-		}
+		logCh <- msg
 	}
 
 	// Parse payload
@@ -46,21 +44,24 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 	workdir := filepath.Join(j.WorkspaceBase, j.Ticket.ID)
 	send("📁 Preparing Terraform workspace...")
 
-	vars := map[string]interface{}{
-		"app_name":  j.Deployment.AppName,
-		"namespace": j.Deployment.Namespace,
-		"image":     payload.Image,
-		"port":      payload.Port,
-		"replicas":  payload.Replicas,
-		"domain":    payload.Domain,
-		"cpu":       payload.Resources.CPU,
-		"memory":    payload.Resources.Memory,
-		"env":       payload.Env,
-	}
-	if vars["env"] == nil {
-		vars["env"] = map[string]string{}
+	env := payload.Env
+	if env == nil {
+		env = map[string]string{}
 	}
 
+	vars := map[string]interface{}{
+		"app_name":    j.Deployment.AppName,
+		"namespace":   j.Deployment.Namespace,
+		"image":       payload.Image,
+		"port":        payload.Port,
+		"replicas":    payload.Replicas,
+		"domain":      payload.Domain,
+		"cpu":         payload.Resources.CPU,
+		"memory":      payload.Resources.Memory,
+		"env":         env,
+		"zone_domain":  os.Getenv("ROUTE53_ZONE_DOMAIN"),
+		"cluster_name": os.Getenv("EKS_CLUSTER_NAME"),
+	}
 	if err := terraform.PrepareWorkspace(j.TemplateDir, workdir, vars); err != nil {
 		send(fmt.Sprintf("❌ Failed to prepare workspace: %v", err))
 		j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketFailed, nil, nil) //nolint:errcheck

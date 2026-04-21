@@ -27,7 +27,6 @@ type Server struct {
 func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, jwtSecret, tfBinary string) *Server {
 	e := echo.New()
 	e.HideBanner = true
-	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
 		AllowOrigins: []string{"*"},
@@ -52,7 +51,7 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	authHandler := handler.NewAuthHandler(authSvc)
 	userHandler := handler.NewUserHandler(authSvc)
 	ticketHandler := handler.NewTicketHandler(ticketSvc, runner)
-	deployHandler := handler.NewDeploymentHandler(deployRepo)
+	deployHandler := handler.NewDeploymentHandler(deployRepo, runner, tfBinary)
 	providerHandler := handler.NewProviderHandler(providerRepo, registry)
 	driftHandler := handler.NewDriftHandler(repo.NewDriftRepo(db), deployRepo, ticketRepo, "terraform/workspaces", tfBinary)
 
@@ -84,6 +83,7 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	api.GET("/deployments", deployHandler.List)
 	api.GET("/deployments/:id", deployHandler.GetByID)
 	api.DELETE("/deployments/:id", deployHandler.Delete)
+	api.POST("/deployments/:id/destroy", deployHandler.Destroy, mw.RequireRole("admin"))
 
 	// Drift
 	api.GET("/drift", driftHandler.ListAll)

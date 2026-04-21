@@ -27,10 +27,7 @@ func (j *TerraformDbJob) Execute(ctx context.Context, logCh chan<- string) error
 	defer close(logCh)
 
 	send := func(msg string) {
-		select {
-		case logCh <- msg:
-		default:
-		}
+		logCh <- msg
 	}
 
 	var payload model.DbRequestPayload
@@ -48,7 +45,7 @@ func (j *TerraformDbJob) Execute(ctx context.Context, logCh chan<- string) error
 	vars := map[string]interface{}{
 		"instance_name":     payload.InstanceName,
 		"db_type":           payload.DbType,
-		"version":           payload.Version,
+		"engine_version":    payload.Version,
 		"storage_gb":        payload.StorageGB,
 		"high_availability": payload.HighAvailability,
 		"vpc_id":            os.Getenv("VPC_ID"),

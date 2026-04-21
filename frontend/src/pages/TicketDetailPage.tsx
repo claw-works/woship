@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTicket, submitTicket, approveTicket, rejectTicket, type Ticket, type DockerDeployPayload, type DbRequestPayload, type DevProjectPayload } from '../api/tickets'
+import { destroyDeployment, type Deployment } from '../api/deployments'
 import { useAuth } from '../hooks/useAuth'
 import StatusBadge from '../components/StatusBadge'
 import LogStream from '../components/LogStream'
-import { ArrowLeft, CheckCircle, XCircle, Send } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Send, Trash2 } from 'lucide-react'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -93,9 +94,23 @@ export default function TicketDetailPage() {
     },
   })
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['ticket', id] })
+  const { data: deployments = [] } = useQuery({
+    queryKey: ['deployments', id],
+    queryFn: async () => {
+      const { data } = await (await import('../api/client')).default.get<Deployment[]>('/api/deployments')
+      return data.filter((d) => d.ticket_id === id)
+    },
+    refetchInterval: 3000,
+  })
+
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['ticket', id] }); qc.invalidateQueries({ queryKey: ['deployments', id] }) }
   const submitMut = useMutation({ mutationFn: () => submitTicket(id!), onSuccess: invalidate, onError: () => setActionError('提交审批失败') })
   const approveMut = useMutation({ mutationFn: () => approveTicket(id!), onSuccess: invalidate, onError: () => setActionError('审批操作失败') })
+  const destroyMut = useMutation({
+    mutationFn: (deployId: string) => destroyDeployment(deployId),
+    onSuccess: invalidate,
+    onError: () => setActionError('回收资源失败'),
+  })
   const rejectMut = useMutation({
     mutationFn: () => rejectTicket(id!, rejectReason),
     onSuccess: () => { setRejectModalOpen(false); setRejectReason(''); invalidate() },
@@ -106,7 +121,8 @@ export default function TicketDetailPage() {
   if (!ticket) return <div className="py-20 text-center text-gray-400">工单不存在</div>
 
   const isApprover = user?.role === 'admin' || user?.role === 'approver'
-  const showLog = ['deploying', 'done', 'failed'].includes(ticket.status)
+  const isDestroying = deployments.some((d) => d.status === 'destroying')
+  const showLog = ['deploying', 'done', 'failed'].includes(ticket.status) || isDestroying
 
   return (
     <div className="p-8 flex flex-col items-center">
@@ -168,11 +184,34 @@ export default function TicketDetailPage() {
           {!['draft', 'pending', 'rejected'].includes(ticket.status) && (
             <p className="text-sm text-gray-500">当前状态 <StatusBadge status={ticket.status} />，无可用操作。</p>
           )}
+
+          {ticket.status === 'done' && isApprover && deployments.length > 0 && (
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-[13px] font-medium text-gray-500 mb-3">资源管理</h3>
+              {deployments.filter((d) => d.status === 'running').map((d) => (
+                <button key={d.id} onClick={() => { if (confirm(`确认回收 ${d.app_name} 的所有云资源？此操作不可逆。`)) destroyMut.mutate(d.id) }}
+                  disabled={destroyMut.isPending}
+                  className="flex items-center gap-2 bg-red-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-red-700 disabled:opacity-50 transition">
+                  <Trash2 className="w-4 h-4" /> {destroyMut.isPending ? '回收中...' : `回收资源 (${d.app_name})`}
+                </button>
+              ))}
+              {isDestroying && (
+                <div className="flex items-center gap-2 text-amber-600 text-sm font-medium">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> 资源回收中，请查看下方日志...
+                </div>
+              )}
+              {deployments.every((d) => d.status === 'stopped') && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
+                  <p className="text-sm text-emerald-700">✅ 资源已回收</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {showLog && (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-            <LogStream ticketId={ticket.id} isActive={ticket.status === 'deploying'} />
+            <LogStream ticketId={ticket.id} isActive={ticket.status === 'deploying' || isDestroying} />
           </div>
         )}
       </div>

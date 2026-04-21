@@ -6,10 +6,11 @@ import "time"
 type DeploymentStatus string
 
 const (
-	DeployPending DeploymentStatus = "pending"
-	DeployRunning DeploymentStatus = "running"
-	DeployStopped DeploymentStatus = "stopped"
-	DeployFailed  DeploymentStatus = "failed"
+	DeployPending    DeploymentStatus = "pending"
+	DeployRunning    DeploymentStatus = "running"
+	DeployDestroying DeploymentStatus = "destroying"
+	DeployStopped    DeploymentStatus = "stopped"
+	DeployFailed     DeploymentStatus = "failed"
 )
 
 // Deployment records a cloud deployment triggered by a ticket.

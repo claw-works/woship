@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.0"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
   }
 }
 
@@ -15,7 +19,42 @@ variable "replicas"   { type = number }
 variable "domain"     { type = string }
 variable "cpu"        { type = string }
 variable "memory"     { type = string }
-variable "env"        { type = map(string) default = {} }
+variable "env" {
+  type    = map(string)
+  default = {}
+}
+
+variable "zone_domain" {
+  type    = string
+  default = ""
+}
+
+variable "cluster_name" {
+  type    = string
+  default = ""
+}
+
+locals {
+  has_dns = var.zone_domain != "" && var.domain != ""
+}
+
+data "aws_eks_cluster" "cluster" {
+  count = var.cluster_name != "" ? 1 : 0
+  name  = var.cluster_name
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  count = var.cluster_name != "" ? 1 : 0
+  name  = var.cluster_name
+}
+
+provider "kubernetes" {
+  host                   = var.cluster_name != "" ? data.aws_eks_cluster.cluster[0].endpoint : ""
+  cluster_ca_certificate = var.cluster_name != "" ? base64decode(data.aws_eks_cluster.cluster[0].certificate_authority[0].data) : ""
+  token                  = var.cluster_name != "" ? data.aws_eks_cluster_auth.cluster[0].token : ""
+}
+
+# ─── Kubernetes Resources ───
 
 resource "kubernetes_namespace" "ns" {
   metadata { name = var.namespace }
@@ -83,7 +122,7 @@ resource "kubernetes_service" "svc" {
       target_port = var.port
     }
 
-    type = "ClusterIP"
+    type = "LoadBalancer"
   }
 }
 
@@ -117,7 +156,28 @@ resource "kubernetes_ingress_v1" "ingress" {
   }
 }
 
+# ─── Route53 DNS ───
+
+data "aws_route53_zone" "zone" {
+  count = local.has_dns ? 1 : 0
+  name  = var.zone_domain
+}
+
+resource "aws_route53_record" "app" {
+  count   = local.has_dns ? 1 : 0
+  zone_id = data.aws_route53_zone.zone[0].zone_id
+  name    = var.domain
+  type    = "CNAME"
+  ttl     = 300
+  records = [kubernetes_service.svc.status[0].load_balancer[0].ingress[0].hostname]
+}
+
+# ─── Outputs ───
+
 output "app_name"  { value = var.app_name }
 output "namespace" { value = var.namespace }
 output "domain"    { value = var.domain }
 output "image"     { value = var.image }
+output "dns_record" {
+  value = local.has_dns ? "${var.domain} -> LB" : "no DNS configured"
+}

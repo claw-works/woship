@@ -7,10 +7,10 @@ import { ArrowLeft } from 'lucide-react'
 
 const dbTypes = ['postgresql', 'mysql', 'redis', 'mongodb'] as const
 const versions: Record<string, string[]> = {
-  postgresql: ['16', '15', '14'],
-  mysql: ['8.0', '5.7'],
-  redis: ['7.2', '7.0', '6.2'],
-  mongodb: ['7.0', '6.0'],
+  postgresql: ['', '17', '16', '15', '14'],
+  mysql: ['', '8.0', '5.7'],
+  redis: ['', '7.2', '7.0', '6.2'],
+  mongodb: ['', '7.0', '6.0'],
 }
 
 export default function CreateDbTicketPage() {
@@ -18,7 +18,7 @@ export default function CreateDbTicketPage() {
   const [title, setTitle] = useState('')
   const [dbType, setDbType] = useState<typeof dbTypes[number]>('postgresql')
   const [instanceName, setInstanceName] = useState('')
-  const [version, setVersion] = useState('16')
+  const [version, setVersion] = useState('')
   const [storageGb, setStorageGb] = useState(20)
   const [ha, setHa] = useState(false)
   const [providerId, setProviderId] = useState('')
@@ -27,12 +27,15 @@ export default function CreateDbTicketPage() {
 
   const { data: providers = [] } = useQuery({ queryKey: ['providers'], queryFn: listProviders })
 
+  const needsStorage = ['postgresql', 'mysql'].includes(dbType)
+  const needsHA = ['postgresql', 'mysql', 'mongodb'].includes(dbType)
+
   const buildPayload = () => ({
     db_type: dbType,
     instance_name: instanceName,
     version,
-    storage_gb: storageGb,
-    high_availability: ha,
+    storage_gb: needsStorage ? storageGb : 0,
+    high_availability: needsHA ? ha : false,
     provider_id: providerId,
   })
 
@@ -84,7 +87,7 @@ export default function CreateDbTicketPage() {
               <div>
                 <label className={labelCls}>版本</label>
                 <select value={version} onChange={(e) => setVersion(e.target.value)} className={inputCls}>
-                  {(versions[dbType] ?? []).map((v) => <option key={v} value={v}>{v}</option>)}
+                  {(versions[dbType] ?? []).map((v) => <option key={v} value={v}>{v || '默认版本（推荐）'}</option>)}
                 </select>
               </div>
             </div>
@@ -92,11 +95,13 @@ export default function CreateDbTicketPage() {
               <label className={labelCls}>实例名称</label>
               <input type="text" required value={instanceName} onChange={(e) => setInstanceName(e.target.value)} placeholder="my-database" className={inputCls} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelCls}>存储容量 (GB)</label>
-                <input type="number" required min={5} value={storageGb} onChange={(e) => setStorageGb(Number(e.target.value))} className={inputCls} />
-              </div>
+            <div className={`grid ${needsStorage ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+              {needsStorage && (
+                <div>
+                  <label className={labelCls}>存储容量 (GB)</label>
+                  <input type="number" required min={5} value={storageGb} onChange={(e) => setStorageGb(Number(e.target.value))} className={inputCls} />
+                </div>
+              )}
               <div>
                 <label className={labelCls}>Cloud Provider</label>
                 <select required value={providerId} onChange={(e) => setProviderId(e.target.value)} className={inputCls}>
@@ -105,10 +110,12 @@ export default function CreateDbTicketPage() {
                 </select>
               </div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={ha} onChange={(e) => setHa(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand-red focus:ring-brand-red" />
-              <span className="text-sm text-gray-700">启用高可用（主从复制）</span>
-            </label>
+            {needsHA && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={ha} onChange={(e) => setHa(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand-red focus:ring-brand-red" />
+                <span className="text-sm text-gray-700">启用高可用（主从复制）</span>
+              </label>
+            )}
           </div>
 
           {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">{error}</div>}

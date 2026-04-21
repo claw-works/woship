@@ -207,7 +207,7 @@ func buildDeployment(t *model.Ticket) *model.Deployment {
 	d := &model.Deployment{
 		TicketID:  t.ID,
 		Namespace: "woship",
-		AppName:   sanitizeName(t.Title),
+		AppName:   sanitizeName(t.Title, t.ID),
 		Status:    model.DeployPending,
 	}
 
@@ -237,28 +237,44 @@ func buildDeployment(t *model.Ticket) *model.Deployment {
 		}
 		d.ProviderID = ""
 		d.Image = p.Stack
-		d.AppName = sanitizeName(p.ProjectName)
+		d.AppName = sanitizeName(p.ProjectName, t.ID)
 	default:
 		return nil
 	}
 	return d
 }
 
-// sanitizeName converts a title to a k8s-safe app name.
-func sanitizeName(title string) string {
+// sanitizeName converts a title to a k8s-safe app name, appending a short ID suffix for uniqueness.
+func sanitizeName(title, id string) string {
 	out := make([]byte, 0, len(title))
-	for i := 0; i < len(title) && i < 50; i++ {
+	for i := 0; i < len(title) && i < 40; i++ {
 		c := title[i]
-		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
 			out = append(out, c)
 		} else if c >= 'A' && c <= 'Z' {
-			out = append(out, c+32) // to lower
+			out = append(out, c+32)
+		} else if c == '-' || c == '.' {
+			out = append(out, c)
 		} else {
-			out = append(out, '-')
+			if len(out) > 0 && out[len(out)-1] != '-' {
+				out = append(out, '-')
+			}
 		}
 	}
-	if len(out) == 0 {
-		return "app"
+	s := string(out)
+	for len(s) > 0 && s[0] == '-' {
+		s = s[1:]
 	}
-	return string(out)
+	for len(s) > 0 && s[len(s)-1] == '-' {
+		s = s[:len(s)-1]
+	}
+
+	suffix := id
+	if len(suffix) > 8 {
+		suffix = suffix[:8]
+	}
+	if s == "" {
+		return "app-" + suffix
+	}
+	return s + "-" + suffix
 }

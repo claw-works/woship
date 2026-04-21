@@ -15,7 +15,7 @@ export interface DockerDeployPayload {
 export interface DbRequestPayload {
   db_type: 'postgresql' | 'mysql' | 'redis' | 'mongodb'
   instance_name: string
-  version: string
+  version?: string
   storage_gb: number
   high_availability: boolean
   provider_id: string

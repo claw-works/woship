@@ -74,7 +74,7 @@ func (r *Runner) IsDone(ticketID string) bool {
 
 func (r *Runner) work() {
 	for item := range r.queue {
-		logCh := make(chan string, 128)
+		logCh := make(chan string, 4096)
 		go r.collect(item.ticketID, logCh)
 		item.job.Execute(context.Background(), logCh) //nolint:errcheck
 	}

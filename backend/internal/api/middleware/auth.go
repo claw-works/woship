@@ -11,7 +11,8 @@ import (
 // JWTMiddleware returns an Echo middleware that validates Bearer JWT tokens.
 func JWTMiddleware(secret string) echo.MiddlewareFunc {
 	return echojwt.WithConfig(echojwt.Config{
-		SigningKey: []byte(secret),
+		SigningKey:  []byte(secret),
+		TokenLookup: "header:Authorization:Bearer ,query:token",
 	})
 }
 

@@ -1,1 +1,4 @@
 backend/.env
+backend/server
+backend/terraform/workspaces/*/
+infra-output/
