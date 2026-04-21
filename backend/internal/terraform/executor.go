@@ -13,8 +13,9 @@ import (
 
 // Executor wraps terraform/tofu CLI operations on a working directory.
 type Executor struct {
-	workdir string
-	binary  string // "terraform" or "tofu"
+	workdir       string
+	binary        string // "terraform" or "tofu"
+	backendConfig map[string]string
 }
 
 // NewExecutor creates an Executor for the given working directory.
@@ -31,8 +32,18 @@ func NewExecutorWithBinary(workdir, binary string) *Executor {
 	return &Executor{workdir: workdir, binary: binary}
 }
 
-// Init runs terraform init.
+// SetBackendConfig sets S3 backend config passed to init via -backend-config.
+func (e *Executor) SetBackendConfig(cfg map[string]string) {
+	e.backendConfig = cfg
+}
+
+// Init runs terraform init with optional backend config.
 func (e *Executor) Init(logFn func(string)) error {
+	args := []string{"init", "-no-color", "-input=false"}
+	for k, v := range e.backendConfig {
+		args = append(args, fmt.Sprintf("-backend-config=%s=%s", k, v))
+	}
+	return e.run(logFn, args...)
 	return e.run(logFn, "init", "-no-color", "-input=false")
 }
 

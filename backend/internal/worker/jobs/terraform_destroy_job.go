@@ -29,7 +29,18 @@ func (j *TerraformDestroyJob) Execute(_ context.Context, logCh chan<- string) er
 
 	tf := terraform.NewExecutorWithBinary(workdir, j.Binary)
 
-	send("⚙️  Running terraform destroy...")
+	if cfg := s3BackendConfig(j.Deployment.TicketID); cfg != nil {
+		tf.SetBackendConfig(cfg)
+	}
+
+	send("⚙️  Running terraform init...")
+	if err := tf.Init(send); err != nil {
+		send(fmt.Sprintf("❌ terraform init failed: %v", err))
+		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, "❌ init failed: "+err.Error()) //nolint:errcheck
+		return err
+	}
+
+	send("🗑️  Running terraform destroy...")
 	if err := tf.Destroy(send); err != nil {
 		send(fmt.Sprintf("❌ terraform destroy failed: %v", err))
 		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, "❌ destroy failed: "+err.Error()) //nolint:errcheck

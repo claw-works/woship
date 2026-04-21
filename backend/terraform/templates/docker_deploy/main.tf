@@ -9,6 +9,8 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "s3" {}
 }
 
 variable "app_name"   { type = string }

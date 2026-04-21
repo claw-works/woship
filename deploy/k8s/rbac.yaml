@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: woship
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: woship-backend
+  namespace: woship
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::320236118172:role/woship-backend-irsa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: woship-backend
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "services", "pods"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: woship-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: woship-backend
+subjects:
+  - kind: ServiceAccount
+    name: woship-backend
+    namespace: woship

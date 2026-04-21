@@ -61,6 +61,10 @@ func (j *TerraformDbJob) Execute(ctx context.Context, logCh chan<- string) error
 
 	tf := terraform.NewExecutorWithBinary(workdir, j.Binary)
 
+	if cfg := s3BackendConfig(j.Ticket.ID); cfg != nil {
+		tf.SetBackendConfig(cfg)
+	}
+
 	send("⚙️  Running terraform init...")
 	if err := tf.Init(send); err != nil {
 		send(fmt.Sprintf("❌ terraform init failed: %v", err))

@@ -1,4 +1,5 @@
 backend/.env
 backend/server
 backend/terraform/workspaces/*/
+deploy/k8s/secrets.yaml
 infra-output/

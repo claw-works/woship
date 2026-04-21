@@ -70,6 +70,11 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 
 	tf := terraform.NewExecutorWithBinary(workdir, j.Binary)
 
+	// S3 backend
+	if cfg := s3BackendConfig(j.Ticket.ID); cfg != nil {
+		tf.SetBackendConfig(cfg)
+	}
+
 	// Init
 	send("⚙️  Running terraform init...")
 	if err := tf.Init(send); err != nil {

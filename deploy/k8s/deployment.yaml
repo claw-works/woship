@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: woship-backend
+  namespace: woship
+  labels:
+    app: woship-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: woship-backend
+  template:
+    metadata:
+      labels:
+        app: woship-backend
+    spec:
+      serviceAccountName: woship-backend
+      containers:
+        - name: backend
+          image: 320236118172.dkr.ecr.us-east-1.amazonaws.com/woship/backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: TF_BINARY
+              value: "tofu"
+            - name: EKS_CLUSTER_NAME
+              value: "woship-cluster"
+            - name: TF_STATE_BUCKET
+              value: "woship-tf-state-320236118172"
+            - name: TF_STATE_REGION
+              value: "us-east-1"
+            - name: ROUTE53_ZONE_DOMAIN
+              value: "brclient.chat"
+            - name: VPC_ID
+              value: "vpc-08cc449384ba44fd7"
+            - name: SUBNET_IDS
+              value: "subnet-04d02e76a337a91c4,subnet-06d2fd1a513bdadc5"
+            - name: ALLOWED_CIDR
+              value: "10.0.0.0/8"
+          envFrom:
+            - secretRef:
+                name: woship-backend-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: workspace
+              mountPath: /app/terraform/workspaces
+      volumes:
+        - name: workspace
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: woship-backend
+  namespace: woship
+spec:
+  selector:
+    app: woship-backend
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer
