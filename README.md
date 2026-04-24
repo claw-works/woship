@@ -8,8 +8,8 @@
 ## 快速启动（本地开发）
 
 ```bash
-# 1. 启动数据库 + 后端
-docker compose up -d
+# 1. 启动数据库
+docker compose up -d postgres
 
 # 2. 配置环境变量
 cd backend
@@ -29,6 +29,107 @@ npm run dev
 
 ---
 
+## Docker 部署
+
+前后端打包在同一个镜像中，镜像通过 GitHub Actions 自动构建并推送到 GHCR。
+
+### 镜像地址
+
+```
+ghcr.io/claw-works/woship:latest
+```
+
+### 发布新版本
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions 自动构建并推送，生成 tag：`0.1.0`、`0.1`、`latest`。
+
+### 直接运行
+
+```bash
+docker run -d --name woship \
+  -p 8080:8080 \
+  -e DB_HOST=your-db-host \
+  -e DB_PORT=5432 \
+  -e DB_USER=woship \
+  -e DB_PASSWORD=your-password \
+  -e DB_NAME=woship \
+  -e DB_SSLMODE=disable \
+  -e JWT_SECRET=your-jwt-secret \
+  -e VPC_ID=vpc-xxx \
+  -e SUBNET_IDS=subnet-aaa,subnet-bbb \
+  -e TF_STATE_BUCKET=your-tf-state-bucket \
+  -e TF_STATE_REGION=us-east-1 \
+  ghcr.io/claw-works/woship:latest
+```
+
+打开 `http://localhost:8080` 即可访问（前端 + API 同端口）。
+
+### 使用 docker compose
+
+```yaml
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: woship
+      POSTGRES_PASSWORD: woship
+      POSTGRES_DB: woship
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  woship:
+    image: ghcr.io/claw-works/woship:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: woship
+      DB_PASSWORD: woship
+      DB_NAME: woship
+      DB_SSLMODE: disable
+      JWT_SECRET: change-this-secret
+      VPC_ID: vpc-xxx
+      SUBNET_IDS: subnet-aaa,subnet-bbb
+      TF_STATE_BUCKET: your-tf-state-bucket
+      TF_STATE_REGION: us-east-1
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+```
+
+### 环境变量
+
+| 变量 | 必填 | 说明 |
+|------|:---:|------|
+| `DB_HOST` | ✅ | PostgreSQL 地址 |
+| `DB_PORT` | | 默认 5432 |
+| `DB_USER` | ✅ | 数据库用户 |
+| `DB_PASSWORD` | ✅ | 数据库密码 |
+| `DB_NAME` | ✅ | 数据库名 |
+| `DB_SSLMODE` | | 默认 disable |
+| `JWT_SECRET` | ✅ | JWT 签名密钥 |
+| `PORT` | | 服务端口，默认 8080 |
+| `VPC_ID` | ✅ | AWS VPC ID |
+| `SUBNET_IDS` | ✅ | 私有子网 ID（逗号分隔） |
+| `ALLOWED_CIDR` | | 安全组入站 CIDR，默认 10.0.0.0/8 |
+| `TF_STATE_BUCKET` | | S3 bucket 存 terraform state（不设则用本地） |
+| `TF_STATE_REGION` | | S3 bucket region，默认 us-east-1 |
+| `EKS_CLUSTER_NAME` | | EKS 集群名（docker_deploy 工单需要） |
+| `ROUTE53_ZONE_DOMAIN` | | Route53 域名（如 example.com） |
+| `WEB_ROOT` | | 前端静态文件目录，默认 public |
+
+---
+
 ## 部署到 EKS
 
 ### 前置条件
@@ -36,43 +137,25 @@ npm run dev
 | 资源 | 说明 |
 |------|------|
 | EKS 集群 | 已创建，kubectl 可连接 |
-| ECR 仓库 | `320236118172.dkr.ecr.us-east-1.amazonaws.com/woship/backend` |
-| S3 Bucket | `woship-tf-state-320236118172`（存 terraform state） |
+| S3 Bucket | 存 terraform state |
 | RDS PostgreSQL | 后端数据库 |
-| IRSA Role | `woship-backend-irsa`（Pod 的 AWS 权限） |
+| IRSA Role | Pod 的 AWS 权限（S3/RDS/ElastiCache/DocDB/Route53/EC2） |
 
-### 1. 构建并推送镜像
-
-```bash
-cd backend
-
-# 登录 ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 320236118172.dkr.ecr.us-east-1.amazonaws.com
-
-# 构建并推送
-docker build --platform linux/amd64 -t woship-backend .
-docker tag woship-backend:latest 320236118172.dkr.ecr.us-east-1.amazonaws.com/woship/backend:latest
-docker push 320236118172.dkr.ecr.us-east-1.amazonaws.com/woship/backend:latest
-```
-
-### 2. 部署 K8s 资源
+### 部署步骤
 
 ```bash
-# RBAC + ServiceAccount（含 IRSA 注解）
+# 1. RBAC + ServiceAccount（含 IRSA 注解）
 kubectl apply -f deploy/k8s/rbac.yaml
 
-# 创建 Secrets（修改实际值）
+# 2. 创建 Secrets
 cp deploy/k8s/secrets.yaml.example deploy/k8s/secrets.yaml
-# 编辑 secrets.yaml 填入 DB_HOST, DB_PASSWORD, JWT_SECRET
+# 编辑 secrets.yaml 填入实际值
 kubectl apply -f deploy/k8s/secrets.yaml
 
-# 部署后端
+# 3. 部署
 kubectl apply -f deploy/k8s/deployment.yaml
-```
 
-### 3. 验证
-
-```bash
+# 4. 验证
 kubectl get pods -n woship
 kubectl logs -n woship -l app=woship-backend --tail=20
 ```
@@ -159,5 +242,6 @@ draft → pending → approved → deploying → done
 │   ├── pages/               # 页面组件
 │   ├── api/                 # API 客户端
 │   └── components/          # 通用组件
-└── deploy/k8s/              # K8s 部署清单
+├── deploy/k8s/              # K8s 部署清单
+└── .github/workflows/       # CI/CD
 ```
