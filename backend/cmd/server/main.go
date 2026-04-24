@@ -77,6 +77,13 @@ func main() {
 	// Build and start the server
 	srv := api.NewServer(database, registry, runner, jwtSecret, tfBinary)
 
+	// Serve frontend if dist directory exists
+	webRoot := getenv("WEB_ROOT", "public")
+	if _, err := os.Stat(webRoot); err == nil {
+		srv.ServeStaticFrontend(webRoot)
+		log.Printf("🌐 Serving frontend from %s", webRoot)
+	}
+
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("🚀 Starting Woship server on %s", addr)
 	if err := srv.Start(addr); err != nil {

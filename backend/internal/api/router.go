@@ -106,6 +106,18 @@ func (s *Server) Start(addr string) error {
 	return s.e.Start(addr)
 }
 
+// ServeStaticFrontend serves the frontend SPA from the given directory.
+// Must be called after all API routes are registered.
+func (s *Server) ServeStaticFrontend(dir string) {
+	// Serve static files
+	s.e.Static("/", dir)
+
+	// SPA fallback: non-API routes return index.html
+	s.e.GET("/*", func(c echo.Context) error {
+		return c.File(dir + "/index.html")
+	})
+}
+
 // makeJobFactory returns a JobFactory that creates TerraformDeployJobs.
 func makeJobFactory(
 	registry *provider.Registry,
