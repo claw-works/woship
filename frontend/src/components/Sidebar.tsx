@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Gauge, List, Server, LogOut, Ship, PanelLeftOpen, CirclePlus, Box } from 'lucide-react'
+import { Gauge, List, Server, LogOut, Ship, PanelLeftOpen, Box } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 interface SidebarProps {

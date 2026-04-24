@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTicket, submitTicket, approveTicket, rejectTicket, type Ticket, type DockerDeployPayload, type DbRequestPayload, type DevProjectPayload } from '../api/tickets'
-import { destroyDeployment, type Deployment } from '../api/deployments'
+import { destroyDeployment, listDeployments } from '../api/deployments'
 import { useAuth } from '../hooks/useAuth'
 import StatusBadge from '../components/StatusBadge'
 import LogStream from '../components/LogStream'
@@ -39,7 +39,7 @@ const stackLabel: Record<string, string> = {
 }
 
 function TicketPayloadInfo({ ticket }: { ticket: Ticket }) {
-  const p = ticket.payload as Record<string, unknown>
+  const p = ticket.payload
 
   if (ticket.type === 'docker_deploy') {
     const d = p as DockerDeployPayload
@@ -97,8 +97,8 @@ export default function TicketDetailPage() {
   const { data: deployments = [] } = useQuery({
     queryKey: ['deployments', id],
     queryFn: async () => {
-      const { data } = await (await import('../api/client')).default.get<Deployment[]>('/api/deployments')
-      return data.filter((d) => d.ticket_id === id)
+      const all = await listDeployments()
+      return all.filter((d) => d.ticket_id === id)
     },
     refetchInterval: 3000,
   })
