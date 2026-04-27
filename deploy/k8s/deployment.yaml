@@ -18,7 +18,7 @@ spec:
       serviceAccountName: woship-backend
       containers:
         - name: backend
-          image: 320236118172.dkr.ecr.us-east-1.amazonaws.com/woship/backend:latest
+          image: ghcr.io/claw-works/woship:latest
           ports:
             - containerPort: 8080
           env:
