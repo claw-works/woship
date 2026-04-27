@@ -9,16 +9,6 @@ import (
 	"github.com/claw-works/woship/internal/provider"
 )
 
-// TicketUpdater is the minimal interface needed to update ticket status.
-type TicketUpdater interface {
-	UpdateStatus(id string, status model.TicketStatus, reviewerID *string, rejectReason *string) error
-}
-
-// DeploymentUpdater is the minimal interface needed to update deployment status.
-type DeploymentUpdater interface {
-	UpdateStatus(id string, status model.DeploymentStatus, logs string) error
-}
-
 // DockerDeployJob executes a Docker deployment for an approved ticket.
 type DockerDeployJob struct {
 	Ticket     *model.Ticket

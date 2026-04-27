@@ -6,12 +6,40 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/claw-works/woship/internal/model"
 	"github.com/claw-works/woship/internal/terraform"
 )
 
-// TerraformDeployJob executes a Docker deployment via Terraform.
+// TicketUpdater is the subset of TicketRepo needed by jobs.
+type TicketUpdater interface {
+	UpdateStatus(id string, status model.TicketStatus, reviewerID *string, rejectReason *string) error
+}
+
+// DeploymentUpdater is the subset of DeploymentRepo needed by jobs.
+type DeploymentUpdater interface {
+	UpdateStatus(id string, status model.DeploymentStatus, logs string) error
+}
+
+// logCollector wraps logCh to also collect all lines for persistence.
+type logCollector struct {
+	ch    chan<- string
+	lines []string
+}
+
+func newLogCollector(ch chan<- string) *logCollector {
+	return &logCollector{ch: ch}
+}
+
+func (lc *logCollector) send(msg string) {
+	lc.lines = append(lc.lines, msg)
+	lc.ch <- msg
+}
+
+func (lc *logCollector) all() string {
+	return strings.Join(lc.lines, "\n")
+}
 type TerraformDeployJob struct {
 	Ticket        *model.Ticket
 	Deployment    *model.Deployment
@@ -24,16 +52,13 @@ type TerraformDeployJob struct {
 
 func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) error {
 	defer close(logCh)
-
-	send := func(msg string) {
-		logCh <- msg
-	}
+	lc := newLogCollector(logCh)
 
 	// Parse payload
 	var payload model.DockerDeployPayload
 	if err := json.Unmarshal([]byte(j.Ticket.Payload), &payload); err != nil {
-		send(fmt.Sprintf("❌ Failed to parse payload: %v", err))
-		j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketFailed, nil, nil) //nolint:errcheck
+		lc.send(fmt.Sprintf("❌ Failed to parse payload: %v", err))
+		j.fail(lc.all())
 		return err
 	}
 
@@ -42,7 +67,7 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 
 	// Prepare workspace
 	workdir := filepath.Join(j.WorkspaceBase, j.Ticket.ID)
-	send("📁 Preparing Terraform workspace...")
+	lc.send("📁 Preparing Terraform workspace...")
 
 	env := payload.Env
 	if env == nil {
@@ -63,8 +88,8 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 		"cluster_name": os.Getenv("EKS_CLUSTER_NAME"),
 	}
 	if err := terraform.PrepareWorkspace(j.TemplateDir, workdir, vars); err != nil {
-		send(fmt.Sprintf("❌ Failed to prepare workspace: %v", err))
-		j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketFailed, nil, nil) //nolint:errcheck
+		lc.send(fmt.Sprintf("❌ Failed to prepare workspace: %v", err))
+		j.fail(lc.all())
 		return err
 	}
 
@@ -76,38 +101,38 @@ func (j *TerraformDeployJob) Execute(ctx context.Context, logCh chan<- string) e
 	}
 
 	// Init
-	send("⚙️  Running terraform init...")
-	if err := tf.Init(send); err != nil {
-		send(fmt.Sprintf("❌ terraform init failed: %v", err))
-		j.fail(err.Error())
+	lc.send("⚙️  Running terraform init...")
+	if err := tf.Init(lc.send); err != nil {
+		lc.send(fmt.Sprintf("❌ terraform init failed: %v", err))
+		j.fail(lc.all())
 		return err
 	}
 
 	// Apply
-	send("🚀 Running terraform apply...")
-	if err := tf.Apply(send); err != nil {
-		send(fmt.Sprintf("❌ terraform apply failed: %v", err))
-		j.fail(err.Error())
+	lc.send("🚀 Running terraform apply...")
+	if err := tf.Apply(lc.send); err != nil {
+		lc.send(fmt.Sprintf("❌ terraform apply failed: %v", err))
+		j.fail(lc.all())
 		return err
 	}
 
 	// Read outputs
 	outputs, err := tf.Output()
 	if err != nil {
-		send(fmt.Sprintf("⚠️  Failed to read outputs: %v", err))
+		lc.send(fmt.Sprintf("⚠️  Failed to read outputs: %v", err))
 	} else {
 		for k, v := range outputs {
-			send(fmt.Sprintf("  📤 %s = %s", k, v))
+			lc.send(fmt.Sprintf("  📤 %s = %s", k, v))
 		}
 	}
 
-	send("✅ Deployment complete")
-	j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketDone, nil, nil)         //nolint:errcheck
-	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployRunning, "✅ Done") //nolint:errcheck
+	lc.send("✅ Deployment complete")
+	j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketDone, nil, nil)              //nolint:errcheck
+	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployRunning, lc.all()) //nolint:errcheck
 	return nil
 }
 
-func (j *TerraformDeployJob) fail(msg string) {
-	j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketFailed, nil, nil)      //nolint:errcheck
-	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, "❌ "+msg) //nolint:errcheck
+func (j *TerraformDeployJob) fail(logs string) {
+	j.TicketRepo.UpdateStatus(j.Ticket.ID, model.TicketFailed, nil, nil)       //nolint:errcheck
+	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, logs) //nolint:errcheck
 }

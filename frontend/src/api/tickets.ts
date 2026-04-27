@@ -78,3 +78,9 @@ export const approveTicket = (id: string) =>
 
 export const rejectTicket = (id: string, reason: string) =>
   client.put<Ticket>(`/api/tickets/${id}/reject`, { reason }).then((r) => r.data)
+
+export const retryTicket = (id: string) =>
+  client.put(`/api/tickets/${id}/retry`).then((r) => r.data)
+
+export const getTicketDeployLogs = (id: string) =>
+  client.get<{ logs: string }>(`/api/tickets/${id}/deploy-logs`).then((r) => r.data.logs)

@@ -145,6 +145,36 @@ func (s *TicketService) Reject(ticketID, reviewerID, reason string, reviewerRole
 	return s.ticketRepo.UpdateStatus(ticketID, model.TicketRejected, &reviewerID, &reason)
 }
 
+// Retry re-enqueues a failed ticket for deployment.
+func (s *TicketService) Retry(ticketID, userID string, userRole model.Role) error {
+	if userRole != model.RoleApprover && userRole != model.RoleAdmin {
+		return ErrForbidden
+	}
+	t, err := s.ticketRepo.GetByID(ticketID)
+	if err != nil {
+		return err
+	}
+	if t.Status != model.TicketFailed {
+		return ErrInvalidTransition
+	}
+	if err := s.ticketRepo.UpdateStatus(ticketID, model.TicketApproved, &userID, nil); err != nil {
+		return err
+	}
+	// Re-use existing deployment record, reset its status
+	if s.worker != nil && s.jobFactory != nil {
+		deps, _ := s.deployRepo.GetByTicketID(ticketID)
+		if len(deps) > 0 {
+			d := &deps[0]
+			_ = s.deployRepo.UpdateStatus(d.ID, model.DeployPending, "")
+			job, err := s.jobFactory(t, d, d.ProviderID)
+			if err == nil {
+				s.worker.Enqueue(ticketID, job)
+			}
+		}
+	}
+	return nil
+}
+
 // GetByID returns a single ticket.
 func (s *TicketService) GetByID(id string) (*model.Ticket, error) {
 	return s.ticketRepo.GetByID(id)

@@ -44,7 +44,6 @@ func (e *Executor) Init(logFn func(string)) error {
 		args = append(args, fmt.Sprintf("-backend-config=%s=%s", k, v))
 	}
 	return e.run(logFn, args...)
-	return e.run(logFn, "init", "-no-color", "-input=false")
 }
 
 // Apply runs terraform apply with auto-approve.

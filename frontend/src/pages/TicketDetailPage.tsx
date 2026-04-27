@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getTicket, submitTicket, approveTicket, rejectTicket, type Ticket, type DockerDeployPayload, type DbRequestPayload, type DevProjectPayload } from '../api/tickets'
+import { getTicket, submitTicket, approveTicket, rejectTicket, retryTicket, getTicketDeployLogs, type Ticket, type DockerDeployPayload, type DbRequestPayload, type DevProjectPayload } from '../api/tickets'
 import { destroyDeployment, listDeployments } from '../api/deployments'
 import { useAuth } from '../hooks/useAuth'
 import StatusBadge from '../components/StatusBadge'
 import LogStream from '../components/LogStream'
-import { ArrowLeft, CheckCircle, XCircle, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Send, Trash2, RefreshCw } from 'lucide-react'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -116,6 +116,17 @@ export default function TicketDetailPage() {
     onSuccess: () => { setRejectModalOpen(false); setRejectReason(''); invalidate() },
     onError: () => setActionError('驳回操作失败'),
   })
+  const retryMut = useMutation({
+    mutationFn: () => retryTicket(id!),
+    onSuccess: invalidate,
+    onError: () => setActionError('重试失败'),
+  })
+
+  const { data: deployLogs } = useQuery({
+    queryKey: ['deploy-logs', id],
+    queryFn: () => getTicketDeployLogs(id!),
+    enabled: ticket?.status === 'failed',
+  })
 
   if (isLoading) return <div className="py-20 text-center text-gray-400">加载中...</div>
   if (!ticket) return <div className="py-20 text-center text-gray-400">工单不存在</div>
@@ -181,6 +192,18 @@ export default function TicketDetailPage() {
             </div>
           )}
 
+          {ticket.status === 'failed' && isApprover && (
+            <div className="space-y-3">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-red-700 font-medium text-sm"><XCircle className="w-4 h-4" /> 部署失败</div>
+              </div>
+              <button onClick={() => { if (confirm('确认重新执行此工单？')) retryMut.mutate() }} disabled={retryMut.isPending}
+                className="flex items-center gap-2 bg-amber-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition">
+                <RefreshCw className="w-4 h-4" /> {retryMut.isPending ? '重试中...' : '重新执行'}
+              </button>
+            </div>
+          )}
+
           {!['draft', 'pending', 'rejected'].includes(ticket.status) && (
             <p className="text-sm text-gray-500">当前状态 <StatusBadge status={ticket.status} />，无可用操作。</p>
           )}
@@ -212,6 +235,17 @@ export default function TicketDetailPage() {
         {showLog && (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
             <LogStream ticketId={ticket.id} isActive={ticket.status === 'deploying' || isDestroying} />
+          </div>
+        )}
+
+        {ticket.status === 'failed' && deployLogs && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">失败日志</h3>
+            <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto log-terminal">
+              {deployLogs.split('\n').map((line, i) => (
+                <div key={i} className="text-red-400 whitespace-pre-wrap break-all text-[13px] font-mono">{line}</div>
+              ))}
+            </div>
           </div>
         )}
       </div>

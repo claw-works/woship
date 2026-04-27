@@ -2,6 +2,7 @@ package drift
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -75,7 +76,11 @@ func (c *Checker) scan() {
 func (c *Checker) check(d model.Deployment) {
 	workdir := filepath.Join(c.workspaceBase, d.TicketID)
 
-	// Skip if workspace doesn't exist (e.g. noop jobs)
+	// Skip if workspace doesn't exist (e.g. noop jobs or cleaned up)
+	if _, err := os.Stat(workdir); os.IsNotExist(err) {
+		return
+	}
+
 	tf := terraform.NewExecutorWithBinary(workdir, c.binary)
 
 	hasDrift, planOutput, err := tf.Plan(nil)

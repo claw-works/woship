@@ -17,11 +17,17 @@ import (
 type TicketHandler struct {
 	svc    *service.TicketService
 	runner *worker.Runner
+	deployRepo DeploymentRepo
+}
+
+// DeploymentRepo is the subset needed by TicketHandler for deploy logs.
+type DeploymentRepo interface {
+	GetByTicketID(ticketID string) ([]model.Deployment, error)
 }
 
 // NewTicketHandler creates a new TicketHandler.
-func NewTicketHandler(svc *service.TicketService, runner *worker.Runner) *TicketHandler {
-	return &TicketHandler{svc: svc, runner: runner}
+func NewTicketHandler(svc *service.TicketService, runner *worker.Runner, deployRepo DeploymentRepo) *TicketHandler {
+	return &TicketHandler{svc: svc, runner: runner, deployRepo: deployRepo}
 }
 
 type createTicketReq struct {
@@ -100,6 +106,17 @@ type rejectReq struct {
 	Reason string `json:"reason"`
 }
 
+// Retry handles PUT /api/tickets/:id/retry.
+func (h *TicketHandler) Retry(c echo.Context) error {
+	userID := mw.UserIDFromContext(c)
+	role := model.Role(mw.RoleFromContext(c))
+	err := h.svc.Retry(c.Param("id"), userID, role)
+	if err != nil {
+		return ticketServiceError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "retrying"})
+}
+
 // Reject handles PUT /api/tickets/:id/reject.
 func (h *TicketHandler) Reject(c echo.Context) error {
 	var req rejectReq
@@ -146,6 +163,19 @@ func (h *TicketHandler) Logs(c echo.Context) error {
 			}
 		}
 	}
+}
+
+// DeployLogs handles GET /api/tickets/:id/deploy-logs — returns persisted logs from deployment.
+func (h *TicketHandler) DeployLogs(c echo.Context) error {
+	deps, err := h.deployRepo.GetByTicketID(c.Param("id"))
+	if err != nil || len(deps) == 0 {
+		return echo.NewHTTPError(http.StatusNotFound, "no deployment found")
+	}
+	logs := ""
+	if deps[0].Logs != nil {
+		logs = *deps[0].Logs
+	}
+	return c.JSON(http.StatusOK, map[string]string{"logs": logs})
 }
 
 // ticketServiceError maps service errors to HTTP errors.

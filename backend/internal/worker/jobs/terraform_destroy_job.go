@@ -19,13 +19,10 @@ type TerraformDestroyJob struct {
 
 func (j *TerraformDestroyJob) Execute(_ context.Context, logCh chan<- string) error {
 	defer close(logCh)
-
-	send := func(msg string) {
-		logCh <- msg
-	}
+	lc := newLogCollector(logCh)
 
 	workdir := filepath.Join(j.WorkspaceBase, j.Deployment.TicketID)
-	send(fmt.Sprintf("🗑️  Destroying resources for %s...", j.Deployment.AppName))
+	lc.send(fmt.Sprintf("🗑️  Destroying resources for %s...", j.Deployment.AppName))
 
 	tf := terraform.NewExecutorWithBinary(workdir, j.Binary)
 
@@ -33,21 +30,21 @@ func (j *TerraformDestroyJob) Execute(_ context.Context, logCh chan<- string) er
 		tf.SetBackendConfig(cfg)
 	}
 
-	send("⚙️  Running terraform init...")
-	if err := tf.Init(send); err != nil {
-		send(fmt.Sprintf("❌ terraform init failed: %v", err))
-		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, "❌ init failed: "+err.Error()) //nolint:errcheck
+	lc.send("⚙️  Running terraform init...")
+	if err := tf.Init(lc.send); err != nil {
+		lc.send(fmt.Sprintf("❌ terraform init failed: %v", err))
+		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, lc.all()) //nolint:errcheck
 		return err
 	}
 
-	send("🗑️  Running terraform destroy...")
-	if err := tf.Destroy(send); err != nil {
-		send(fmt.Sprintf("❌ terraform destroy failed: %v", err))
-		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, "❌ destroy failed: "+err.Error()) //nolint:errcheck
+	lc.send("🗑️  Running terraform destroy...")
+	if err := tf.Destroy(lc.send); err != nil {
+		lc.send(fmt.Sprintf("❌ terraform destroy failed: %v", err))
+		j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployFailed, lc.all()) //nolint:errcheck
 		return err
 	}
 
-	send("✅ Resources destroyed")
-	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployStopped, "✅ Destroyed") //nolint:errcheck
+	lc.send("✅ Resources destroyed")
+	j.DeployRepo.UpdateStatus(j.Deployment.ID, model.DeployStopped, lc.all()) //nolint:errcheck
 	return nil
 }

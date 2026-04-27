@@ -137,28 +137,113 @@ volumes:
 | 资源 | 说明 |
 |------|------|
 | EKS 集群 | 已创建，kubectl 可连接 |
+| RDS PostgreSQL | 后端数据库（建议在同 VPC 私有子网） |
 | S3 Bucket | 存 terraform state |
-| RDS PostgreSQL | 后端数据库 |
-| IRSA Role | Pod 的 AWS 权限（S3/RDS/ElastiCache/DocDB/Route53/EC2） |
+| Route53 Hosted Zone | 可选，用于 docker_deploy 工单的域名绑定 |
 
-### 部署步骤
+### 1. 创建 IRSA Role
+
+Woship 后端 Pod 需要 AWS 权限来操作 RDS/ElastiCache/DocumentDB/Route53/EC2 等资源。通过 IRSA（IAM Roles for Service Accounts）实现零密钥管理。
 
 ```bash
-# 1. RBAC + ServiceAccount（含 IRSA 注解）
+# 创建 OIDC provider（如果还没有）
+eksctl utils associate-iam-oidc-provider --cluster woship-cluster --approve
+
+# 创建 IRSA role
+eksctl create iamserviceaccount \
+  --cluster woship-cluster \
+  --namespace woship \
+  --name woship-backend \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonRDSFullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonDocDBFullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonRoute53FullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy \
+  --approve --override-existing-serviceaccounts
+```
+
+> 生产环境建议用最小权限的自定义 Policy 替代 FullAccess。
+
+创建完成后，更新 `deploy/k8s/rbac.yaml` 中的 IRSA role ARN：
+
+```yaml
+annotations:
+  eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
+```
+
+### 2. 推送镜像
+
+镜像通过 GitHub Actions 自动构建推送到 GHCR（`ghcr.io/claw-works/woship`），打 tag 即触发：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+如果 EKS 节点无法拉取 GHCR，可以推到 ECR：
+
+```bash
+# 登录 ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+
+# 构建并推送
+docker build -f backend/Dockerfile -t <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/woship:latest .
+docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/woship:latest
+```
+
+然后修改 `deploy/k8s/deployment.yaml` 中的 `image` 字段。
+
+### 3. 创建 Secrets
+
+```bash
+kubectl create namespace woship
+
+kubectl create secret generic woship-backend-secrets -n woship \
+  --from-literal=DB_HOST=<rds-endpoint> \
+  --from-literal=DB_PORT=5432 \
+  --from-literal=DB_USER=woship \
+  --from-literal=DB_PASSWORD=<password> \
+  --from-literal=DB_NAME=woship \
+  --from-literal=DB_SSLMODE=require \
+  --from-literal=JWT_SECRET=$(openssl rand -hex 32)
+```
+
+### 4. 部署
+
+```bash
+# RBAC + ServiceAccount
 kubectl apply -f deploy/k8s/rbac.yaml
 
-# 2. 创建 Secrets
-cp deploy/k8s/secrets.yaml.example deploy/k8s/secrets.yaml
-# 编辑 secrets.yaml 填入实际值
-kubectl apply -f deploy/k8s/secrets.yaml
-
-# 3. 部署
+# Deployment + Service
 kubectl apply -f deploy/k8s/deployment.yaml
-
-# 4. 验证
-kubectl get pods -n woship
-kubectl logs -n woship -l app=woship-backend --tail=20
 ```
+
+`deployment.yaml` 中的环境变量需要根据实际基础设施修改：
+
+| 变量 | 示例值 | 说明 |
+|------|--------|------|
+| `EKS_CLUSTER_NAME` | `woship-cluster` | 当前 EKS 集群名 |
+| `VPC_ID` | `vpc-08cc4493...` | VPC ID |
+| `SUBNET_IDS` | `subnet-04d0...,subnet-06d2...` | 私有子网（逗号分隔） |
+| `TF_STATE_BUCKET` | `woship-tf-state-xxx` | S3 bucket |
+| `ROUTE53_ZONE_DOMAIN` | `example.com` | Route53 托管域名 |
+
+### 5. 验证
+
+```bash
+# Pod 状态
+kubectl get pods -n woship
+
+# 日志
+kubectl logs -n woship -l app=woship-backend --tail=20
+
+# 获取 LoadBalancer 地址
+kubectl get svc -n woship woship-backend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+打开 LoadBalancer 地址即可访问，默认账号 `admin@woship.local` / `admin123`。
 
 ---
 

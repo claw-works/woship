@@ -50,7 +50,7 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
 	userHandler := handler.NewUserHandler(authSvc)
-	ticketHandler := handler.NewTicketHandler(ticketSvc, runner)
+	ticketHandler := handler.NewTicketHandler(ticketSvc, runner, deployRepo)
 	deployHandler := handler.NewDeploymentHandler(deployRepo, runner, tfBinary)
 	providerHandler := handler.NewProviderHandler(providerRepo, registry)
 	driftHandler := handler.NewDriftHandler(repo.NewDriftRepo(db), deployRepo, ticketRepo, "terraform/workspaces", tfBinary)
@@ -77,7 +77,9 @@ func NewServer(db *sqlx.DB, registry *provider.Registry, runner *worker.Runner, 
 	api.PUT("/tickets/:id/submit", ticketHandler.Submit)
 	api.PUT("/tickets/:id/approve", ticketHandler.Approve, mw.RequireRole("approver", "admin"))
 	api.PUT("/tickets/:id/reject", ticketHandler.Reject, mw.RequireRole("approver", "admin"))
+	api.PUT("/tickets/:id/retry", ticketHandler.Retry, mw.RequireRole("approver", "admin"))
 	api.GET("/tickets/:id/logs", ticketHandler.Logs)
+	api.GET("/tickets/:id/deploy-logs", ticketHandler.DeployLogs)
 
 	// Deployments
 	api.GET("/deployments", deployHandler.List)

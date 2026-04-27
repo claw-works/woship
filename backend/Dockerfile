@@ -10,7 +10,7 @@ RUN npm run build
 FROM golang:1.22-alpine AS backend
 WORKDIR /app
 COPY backend/go.mod backend/go.sum ./
-RUN go mod download
+RUN GOPROXY=https://goproxy.cn,direct go mod download
 COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /woship-server ./cmd/server
 

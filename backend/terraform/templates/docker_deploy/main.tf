@@ -58,14 +58,17 @@ provider "kubernetes" {
 
 # ─── Kubernetes Resources ───
 
+# Namespace is shared across deployments — don't manage its lifecycle per-ticket.
+# Create only if it doesn't exist; never destroy it when a single ticket is removed.
 resource "kubernetes_namespace" "ns" {
   metadata { name = var.namespace }
+  lifecycle { ignore_changes = all }
 }
 
 resource "kubernetes_deployment" "app" {
   metadata {
     name      = var.app_name
-    namespace = kubernetes_namespace.ns.metadata[0].name
+    namespace = var.namespace
     labels    = { app = var.app_name }
   }
 
@@ -113,7 +116,7 @@ resource "kubernetes_deployment" "app" {
 resource "kubernetes_service" "svc" {
   metadata {
     name      = var.app_name
-    namespace = kubernetes_namespace.ns.metadata[0].name
+    namespace = var.namespace
   }
 
   spec {
@@ -131,7 +134,7 @@ resource "kubernetes_service" "svc" {
 resource "kubernetes_ingress_v1" "ingress" {
   metadata {
     name      = var.app_name
-    namespace = kubernetes_namespace.ns.metadata[0].name
+    namespace = var.namespace
     annotations = {
       "kubernetes.io/ingress.class" = "nginx"
     }
