@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/claw-works/woship/internal/api/handler"
 	mw "github.com/claw-works/woship/internal/api/middleware"
@@ -111,12 +113,13 @@ func (s *Server) Start(addr string) error {
 // ServeStaticFrontend serves the frontend SPA from the given directory.
 // Must be called after all API routes are registered.
 func (s *Server) ServeStaticFrontend(dir string) {
-	// Serve static files
-	s.e.Static("/", dir)
-
-	// SPA fallback: non-API routes return index.html
+	// SPA: serve static file if exists, otherwise fallback to index.html
 	s.e.GET("/*", func(c echo.Context) error {
-		return c.File(dir + "/index.html")
+		path := filepath.Join(dir, c.Request().URL.Path)
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return c.File(path)
+		}
+		return c.File(filepath.Join(dir, "index.html"))
 	})
 }
 
