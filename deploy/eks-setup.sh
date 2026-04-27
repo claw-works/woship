@@ -3,18 +3,18 @@
 # Usage: ./deploy/eks-setup.sh
 set -euo pipefail
 
-REGION="us-east-1"
-CLUSTER_NAME="woship-cluster"
+REGION="${AWS_REGION:-us-east-1}"
+CLUSTER_NAME="${EKS_CLUSTER_NAME:?Set EKS_CLUSTER_NAME}"
 NAMESPACE="woship"
-VPC_ID="vpc-08cc449384ba44fd7"
-PRIVATE_SUBNETS="subnet-04d02e76a337a91c4,subnet-06d2fd1a513bdadc5"
-VPC_CIDR="10.0.0.0/16"
+VPC_ID="${VPC_ID:?Set VPC_ID}"
+PRIVATE_SUBNETS="${SUBNET_IDS:?Set SUBNET_IDS (comma-separated)}"
+VPC_CIDR="${VPC_CIDR:-10.0.0.0/16}"
 
 DB_IDENTIFIER="woship-pg"
 DB_USER="woship"
 DB_NAME="woship"
-DB_INSTANCE_CLASS="db.t3.micro"
-DB_STORAGE=20
+DB_INSTANCE_CLASS="${DB_INSTANCE_CLASS:-db.t3.micro}"
+DB_STORAGE="${DB_STORAGE:-20}"
 
 echo "=== Woship EKS Setup ==="
 
