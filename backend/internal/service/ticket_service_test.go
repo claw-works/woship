@@ -106,6 +106,15 @@ func (m *mockDeployRepo) UpdateStatus(id string, status model.DeploymentStatus, 
 	return nil
 }
 
+func (m *mockDeployRepo) ExistsActive(namespace, appName string) (bool, error) {
+	for _, d := range m.deployments {
+		if d.Namespace == namespace && d.AppName == appName && d.Status != model.DeployStopped {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ---- mock worker ----
 
 type mockWorker struct {

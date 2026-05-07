@@ -15,6 +15,8 @@ var (
 	ErrInvalidTransition = errors.New("invalid status transition")
 	// ErrForbidden is returned when the caller lacks required permissions.
 	ErrForbidden = errors.New("forbidden")
+	// ErrDuplicateApp is returned when namespace+app_name already has an active deployment.
+	ErrDuplicateApp = errors.New("an active deployment with the same namespace and app name already exists")
 )
 
 // TicketRepository defines the persistence interface needed by TicketService.
@@ -32,6 +34,7 @@ type DeploymentRepository interface {
 	GetByTicketID(ticketID string) ([]model.Deployment, error)
 	List() ([]model.Deployment, error)
 	UpdateStatus(id string, status model.DeploymentStatus, logs string) error
+	ExistsActive(namespace, appName string) (bool, error)
 }
 
 // JobEnqueuer can enqueue deployment jobs.
@@ -119,6 +122,9 @@ func (s *TicketService) Approve(ticketID, reviewerID string, reviewerRole model.
 		d := buildDeployment(t)
 		if d != nil {
 			if s.deployRepo != nil {
+				if exists, _ := s.deployRepo.ExistsActive(d.Namespace, d.AppName); exists {
+					return ErrDuplicateApp
+				}
 				_ = s.deployRepo.Create(d)
 			}
 			job, err := s.jobFactory(t, d, d.ProviderID)
@@ -249,6 +255,9 @@ func buildDeployment(t *model.Ticket) *model.Deployment {
 		}
 		d.ProviderID = p.ProviderID
 		d.Image = p.Image
+		if p.Namespace != "" {
+			d.Namespace = p.Namespace
+		}
 		if p.Domain != "" {
 			d.Domain = &p.Domain
 		}

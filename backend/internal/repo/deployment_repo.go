@@ -70,3 +70,12 @@ func (r *DeploymentRepo) ListRunning() ([]model.Deployment, error) {
 	var deployments []model.Deployment
 	return deployments, r.db.Select(&deployments, `SELECT * FROM deployments WHERE status='running'`)
 }
+
+// ExistsActive checks if an active deployment with the same namespace+app_name already exists.
+func (r *DeploymentRepo) ExistsActive(namespace, appName string) (bool, error) {
+	var exists bool
+	err := r.db.Get(&exists,
+		`SELECT EXISTS(SELECT 1 FROM deployments WHERE namespace=$1 AND app_name=$2 AND status != 'stopped')`,
+		namespace, appName)
+	return exists, err
+}

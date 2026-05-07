@@ -6,6 +6,7 @@ export interface DockerDeployPayload {
   image: string
   port: number
   domain: string
+  namespace?: string
   replicas: number
   env?: Record<string, string>
   resources: { cpu: string; memory: string }

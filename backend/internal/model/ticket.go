@@ -82,6 +82,7 @@ type DockerDeployPayload struct {
 	Image      string            `json:"image"`
 	Port       int               `json:"port"`
 	Domain     string            `json:"domain"`
+	Namespace  string            `json:"namespace,omitempty"`
 	Replicas   int               `json:"replicas"`
 	Env        map[string]string `json:"env,omitempty"`
 	Resources  ResourceSpec      `json:"resources"`

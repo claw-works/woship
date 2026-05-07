@@ -8,11 +8,10 @@ import (
 
 // Config holds AWS provider configuration.
 type Config struct {
-	Region          string `json:"region"`
-	ClusterName     string `json:"cluster_name"`
-	KubeconfigPath  string `json:"kubeconfig_path"`
-	HostedZoneID    string `json:"hosted_zone_id"`
-	AccessKeyID     string `json:"access_key_id"`
+	Region         string `json:"region"`
+	ClusterName    string `json:"cluster_name"`
+	HostedZoneID   string `json:"hosted_zone_id"`
+	AccessKeyID    string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`
 }
 

@@ -37,7 +37,8 @@ variable "cluster_name" {
 }
 
 locals {
-  has_dns = var.zone_domain != "" && var.domain != ""
+  has_dns    = var.zone_domain != "" && var.domain != ""
+  has_domain = var.domain != ""
 }
 
 data "aws_eks_cluster" "cluster" {
@@ -132,6 +133,8 @@ resource "kubernetes_service" "svc" {
 }
 
 resource "kubernetes_ingress_v1" "ingress" {
+  count = local.has_domain ? 1 : 0
+
   metadata {
     name      = var.app_name
     namespace = var.namespace
@@ -181,8 +184,10 @@ resource "aws_route53_record" "app" {
 
 output "app_name"  { value = var.app_name }
 output "namespace" { value = var.namespace }
-output "domain"    { value = var.domain }
 output "image"     { value = var.image }
-output "dns_record" {
-  value = local.has_dns ? "${var.domain} -> LB" : "no DNS configured"
+output "elb_hostname" {
+  value = kubernetes_service.svc.status[0].load_balancer[0].ingress[0].hostname
+}
+output "access_url" {
+  value = local.has_dns ? "https://${var.domain}" : "http://${kubernetes_service.svc.status[0].load_balancer[0].ingress[0].hostname}"
 }
